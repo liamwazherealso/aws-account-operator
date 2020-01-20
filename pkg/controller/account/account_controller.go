@@ -45,7 +45,7 @@ const (
 	iamUserNameSRE          = "osdManagedAdminSRE"
 	awsAMI                  = "ami-000db10762d0c4c05"
 	awsInstanceType         = "t2.micro"
-	createPendTime          = 10 * time.Minute
+	PendTime                = 25 * time.Minute
 	// Fields used to create/monitor AWS case
 	caseCategoryCode              = "other-account-issues"
 	caseServiceCode               = "customer-account"
@@ -161,9 +161,6 @@ var ErrAwsFailedDescribeSupportCase = errors.New("FailedDescribeSupportCase")
 
 // ErrFederationTokenOutputNil indicates that getting a federation token from AWS failed
 var ErrFederationTokenOutputNil = errors.New("FederationTokenOutputNil")
-
-// ErrCreateEC2Instance indicates that the CreateEC2Instance function timed out
-var ErrCreateEC2Instance = errors.New("EC2CreationTimeout")
 
 // ErrFailedAWSTypecast indicates that there was a failure while typecasting to aws error
 var ErrFailedAWSTypecast = errors.New("FailedToTypecastAWSError")
@@ -405,8 +402,8 @@ func (r *ReconcileAccount) Reconcile(request reconcile.Request) (reconcile.Resul
 		// see if in creating for longer then 10 minutes
 		now := time.Now()
 		diff := now.Sub(currentAcctInstance.ObjectMeta.CreationTimestamp.Time)
-		if currentAcctInstance.Status.State == "Creating" && diff > createPendTime {
-			r.setStatusFailed(reqLogger, currentAcctInstance, "Creation pending for longer then 10 minutes")
+		if currentAcctInstance.Status.State == "Creating" && diff > PendTime {
+			r.setStatusFailed(reqLogger, currentAcctInstance, "Creation pending for longer then 25 minutes")
 		}
 
 		if (currentAcctInstance.Status.State == "") && (currentAcctInstance.Status.Claimed == false) {

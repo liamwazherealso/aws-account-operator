@@ -14,6 +14,9 @@ import (
 	controllerutils "github.com/openshift/aws-account-operator/pkg/controller/utils"
 )
 
+// EC2CreationTimeout indicates that the CreateEC2Instance function timed out
+var EC2CreationTimeout = errors.New("EC2CreationTimeout")
+
 // InitializeSupportedRegions concurrently calls InitalizeRegion to create instances in all supported regions
 // This should ensure we don't see any AWS API "PendingVerification" errors when launching instances
 func (r *ReconcileAccount) InitializeSupportedRegions(reqLogger logr.Logger, regions map[string]map[string]string, creds *sts.AssumeRoleOutput) error {
@@ -100,7 +103,11 @@ func (r *ReconcileAccount) BuildandDestroyEC2Instances(reqLogger logr.Logger, aw
 
 	// Wait till instance is running
 	var DescError error
+	start := time.Now()
 	for i := 0; i < 300; i++ {
+		if time.Since(start) > PendTime {
+			return EC2CreationTimeout
+		}
 		var code int
 		time.Sleep(1 * time.Second)
 		code, DescError = DescribeEC2Instances(reqLogger, awsClient, instanceID)
@@ -143,12 +150,12 @@ func CreateEC2Instance(reqLogger logr.Logger, client awsclient.Client, ami strin
 	var timeoutInstanceID string
 
 	// Loop until an EC2 instance is created or timeout.
-	attempt := 1
+	start := time.Now()
 	for i := 0; i < 300; i++ {
-		time.Sleep(time.Duration(attempt*5) * time.Second)
-		attempt++
-		if attempt%5 == 0 {
-			attempt = attempt * 2
+		time.Sleep(time.Duration(5) * time.Second)
+
+		if time.Since(start) > PendTime {
+			return timeoutInstanceID, EC2CreationTimeout
 		}
 		// Specify the details of the instance that you want to create.
 		runResult, runErr := client.RunInstances(&ec2.RunInstancesInput{
@@ -182,7 +189,7 @@ func CreateEC2Instance(reqLogger logr.Logger, client awsclient.Client, ami strin
 	}
 
 	// Timeout occurred, return instance id and timeout error
-	return timeoutInstanceID, ErrCreateEC2Instance
+	return timeoutInstanceID, EC2CreationTimeout
 }
 
 // DescribeEC2Instances returns the InstanceState code
